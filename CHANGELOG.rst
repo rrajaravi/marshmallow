@@ -1,6 +1,13 @@
 Changelog
 ---------
 
+2.6.1 (2016-03-17)
+++++++++++++++++++
+
+Bug fixes:
+
+- Respect `load_from` when reporting errors for nested required fields (:issue:`414`). Thanks :user:`yumike`.
+
 2.6.0 (2016-02-01)
 ++++++++++++++++++
 
