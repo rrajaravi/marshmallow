@@ -61,4 +61,7 @@ Contributors (chronological)
 - Taylan Develioglu `@tdevelioglu <https://github.com/tdevelioglu>`_
 - Danilo Akamine `@daniloakamine <https://github.com/daniloakamine>`_
 - Maxim Kulkin `@maximkulkin <https://github.com/maximkulkin>`_
+- `@immerrr <https://github.com/immerrr>`_
 - Mike Yumatov `@yumike <https://github.com/yumike>`_
+- Tim Mundt `@Tim-Erwin <https://github.com/Tim-Erwin>`_
+- Russell Davies `@russelldavies <https://github.com/russelldavies>`_

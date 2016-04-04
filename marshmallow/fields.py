@@ -158,7 +158,6 @@ class Field(FieldABC):
         self.metadata = metadata
         self._creation_index = Field._creation_index
         Field._creation_index += 1
-        self.parent = FieldABC.parent
 
         # Collect default error message from self and parent classes
         messages = {}
@@ -190,17 +189,19 @@ class Field(FieldABC):
         does not succeed.
         """
         errors = []
+        kwargs = {}
         for validator in self.validators:
             try:
                 if validator(value) is False:
                     self.fail('validator_failed')
             except ValidationError as err:
+                kwargs.update(err.kwargs)
                 if isinstance(err.messages, dict):
                     errors.append(err.messages)
                 else:
                     errors.extend(err.messages)
         if errors:
-            raise ValidationError(errors)
+            raise ValidationError(errors, **kwargs)
 
     # Hat tip to django-rest-framework.
     def fail(self, key, **kwargs):
@@ -318,9 +319,9 @@ class Field(FieldABC):
 
     @property
     def root(self):
-        """Reference to the top-level `Schema` that this field belongs to."""
+        """Reference to the `Schema` that this field belongs to even if it is buried in a `List`."""
         ret = self
-        while ret.parent:
+        while hasattr(ret, 'parent') and ret.parent:
             ret = ret.parent
         return ret
 
@@ -360,12 +361,11 @@ class Nested(Field):
         'type': 'Invalid type.',
     }
 
-    def __init__(self, nested, default=missing_, exclude=tuple(), only=None,
-                many=False, **kwargs):
+    def __init__(self, nested, default=missing_, exclude=tuple(), only=None, **kwargs):
         self.nested = nested
         self.only = only
         self.exclude = exclude
-        self.many = many
+        self.many = kwargs.get('many', False)
         self.__schema = None  # Cached Schema instance
         self.__updated_fields = False
         super(Nested, self).__init__(default=default, **kwargs)
@@ -382,28 +382,30 @@ class Nested(Field):
             only = (self.only, )
         else:
             only = self.only
+
+        # Inherit context from parent.
+        context = getattr(self.parent, 'context', {})
         if not self.__schema:
             if isinstance(self.nested, SchemaABC):
                 self.__schema = self.nested
+                self.__schema.context.update(context)
             elif isinstance(self.nested, type) and \
                     issubclass(self.nested, SchemaABC):
                 self.__schema = self.nested(many=self.many,
-                        only=only, exclude=self.exclude)
+                        only=only, exclude=self.exclude, context=context)
             elif isinstance(self.nested, basestring):
                 if self.nested == _RECURSIVE_NESTED:
                     parent_class = self.parent.__class__
                     self.__schema = parent_class(many=self.many, only=only,
-                            exclude=self.exclude)
+                            exclude=self.exclude, context=context)
                 else:
                     schema_class = class_registry.get_class(self.nested)
                     self.__schema = schema_class(many=self.many,
-                            only=only, exclude=self.exclude)
+                            only=only, exclude=self.exclude, context=context)
             else:
                 raise ValueError('Nested fields must be passed a '
                                  'Schema, not {0}.'.format(self.nested.__class__))
         self.__schema.ordered = getattr(self.parent, 'ordered', False)
-        # Inherit context from parent
-        self.__schema.context.update(getattr(self.parent, 'context', {}))
         return self.__schema
 
     def _serialize(self, nested_obj, attr, obj):
@@ -576,14 +578,15 @@ class String(Field):
 class UUID(String):
     """A UUID field."""
     default_error_messages = {
-        'invalid_guid': 'Not a valid UUID.'
+        'invalid_uuid': 'Not a valid UUID.',
+        'invalid_guid': 'Not a valid UUID.'  # TODO: Remove this in marshmallow 3.0
     }
 
     def _deserialize(self, value, attr, data):
         try:
             return uuid.UUID(value)
         except (ValueError, AttributeError):
-            self.fail('invalid_guid')
+            self.fail('invalid_uuid')
 
 
 class Number(Field):
